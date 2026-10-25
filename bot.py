@@ -103,7 +103,7 @@ def run_bot():
               else:
                 reply_msg = (
                     "Bot is active! You are already registered for daily"
-                    " briefings at 09:35 PM IST. 🛡️"
+                    " briefings at 08:00 AM IST. 🛡️"
                 )
 
               try:
