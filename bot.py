@@ -1,62 +1,126 @@
 import os
+import threading
+import time
+from flask import Flask
 import requests
+import schedule
 
 TOKEN = "8964911496:AAGDFmg-2BhUg16Db3zfFZrKCrFsLWM6DAw"
 USERS_FILE = "users.txt"
 
-try:
-  # 1. Fetch incoming messages from Telegram
-  res = requests.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates").json()
+# Simple Flask app to satisfy Render's web service requirement
+app = Flask(__name__)
 
-  existing_users = set()
+
+@app.route("/")
+def home():
+  return "CyberPulse Bot is active!"
+
+
+def load_users():
   if os.path.exists(USERS_FILE):
-    with open(USERS_FILE, "r") as f:
-      existing_users.update(f.read().splitlines())
+    try:
+      with open(USERS_FILE, "r") as f:
+        return set(f.read().splitlines())
+    except Exception:
+      pass
+  return set()
 
-  updated_users = set(existing_users)
 
-  # 2. Check for new users and send instant welcome message
-  if res.get("ok"):
-    for update in res.get("result", []):
-      chat = update.get("message", {}).get("chat", {})
-      chat_id = str(chat.get("id"))
+def save_users(users):
+  try:
+    with open(USERS_FILE, "w") as f:
+      f.write("\n".join(users))
+  except Exception as e:
+    print(f"Error saving users: {e}")
 
-      if chat_id and chat_id != "None":
-        if chat_id not in existing_users:
-          welcome_msg = (
-              "Your ID has been recorded! You will now regularly get cybernews"
-              " on time - 08:48 PM IST."
-          )
+
+def send_daily_news():
+  try:
+    users = load_users()
+    if not users:
+      return
+
+    news_res = requests.get(
+        "https://api.rss2json.com/v1/api.json?rss_url=https://feeds.feedburner.com/TheHackersNews",
+        timeout=10,
+    )
+    if news_res.status_code != 200 or not news_res.text.strip():
+      return
+    news_data = news_res.json()
+    items = news_data.get("items", [])[:5]
+
+    msg = "🛡️ *CYBERPULSE DAILY THREAT BRIEFING*\n━━━━━━━━━━━━━━━━━━━━\n"
+    for idx, item in enumerate(items, 1):
+      msg += f"\n*{idx}. {item.get('title')}*\n🔗 {item.get('link')}\n"
+
+    for cid in users:
+      if cid.strip():
+        try:
           requests.post(
               f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-              json={"chat_id": chat_id, "text": welcome_msg},
+              json={"chat_id": cid.strip(), "text": msg, "parse_mode": "Markdown"},
+              timeout=10,
           )
-          print(f"Welcomed new user: {chat_id}")
+        except Exception:
+          pass
+    print(f"Daily news broadcasted to {len(users)} users successfully!")
+  except Exception as e:
+    print(f"Broadcast error: {e}")
 
-        updated_users.add(chat_id)
 
-  # Save updated user list locally
-  with open(USERS_FILE, "w") as f:
-    f.write("\n".join(updated_users))
+def run_bot():
+  # Schedule daily news at 9:35 PM IST (16:05 UTC)
+  schedule.every().day.at("16:05").do(send_daily_news)
+  print("CyberPulse Bot background worker started...")
 
-  # 3. Fetch latest cybersecurity news for broadcast
-  news_res = requests.get(
-      "https://api.rss2json.com/v1/api.json?rss_url=https://feeds.feedburner.com/TheHackersNews"
-  ).json()
-  items = news_res.get("items", [])[:5]
-
-  msg = "🛡️ *CYBERPULSE DAILY THREAT BRIEFING*\n━━━━━━━━━━━━━━━━━━━━\n"
-  for idx, item in enumerate(items, 1):
-    msg += f"\n*{idx}. {item.get('title')}*\n🔗 {item.get('link')}\n"
-
-  # 4. Broadcast news to all registered users
-  for cid in updated_users:
-    if cid.strip():
-      requests.post(
-          f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-          json={"chat_id": cid.strip(), "text": msg, "parse_mode": "Markdown"},
+  offset = 0
+  while True:
+    try:
+      res = requests.get(
+          f"https://api.telegram.org/bot{TOKEN}/getUpdates",
+          params={"offset": offset, "timeout": 30},
+          timeout=35,
       )
 
-  print(f"Broadcasted news to {len(updated_users)} users successfully!")
-except Exception as e:
-  print(f"Error: {e}")
+      if res.status_code == 200 and res.text.strip():
+        data = res.json()
+        if data.get("ok"):
+          for update in data.get("result", []):
+            offset = update["update_id"] + 1
+            chat = update.get("message", {}).get("chat", {})
+            chat_id = str(chat.get("id"))
+
+            if chat_id and chat_id != "None":
+              users = load_users()
+              if chat_id not in users:
+                users.add(chat_id)
+                save_users(users)
+                welcome_msg = (
+                    "Your ID has been recorded! You will now regularly get"
+                    " cybernews on time - 09:35 PM IST."
+                )
+                try:
+                  requests.post(
+                      f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                      json={"chat_id": chat_id, "text": welcome_msg},
+                      timeout=10,
+                  )
+                except Exception:
+                  pass
+
+      schedule.run_pending()
+    except Exception as e:
+      print(f"Polling warning: {e}")
+      time.sleep(5)
+
+
+if __name__ == "__main__":
+  # Start the Telegram bot loop in a background thread
+  t = threading.Thread(target=run_bot)
+  t.daemon = True
+  t.start()
+
+  # Run Flask server on Render's assigned port
+  port = int(os.environ.get("PORT", 10000))
+  app.run(host="0.0.0.0", port=port)
