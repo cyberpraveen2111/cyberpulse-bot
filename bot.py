@@ -71,7 +71,7 @@ def send_daily_news():
 
 def run_bot():
   # Schedule daily news at 9:35 PM IST (16:05 UTC)
-  schedule.every().day.at("17:05").do(send_daily_news)  # 10:31 PM IST
+  schedule.every().day.at("17:10").do(send_daily_news)  # 10:31 PM IST
   print("CyberPulse Bot background worker started...")
 
   offset = 0
