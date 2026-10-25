@@ -96,18 +96,24 @@ def run_bot():
               if chat_id not in users:
                 users.add(chat_id)
                 save_users(users)
-                welcome_msg = (
+                reply_msg = (
                     "Your ID has been recorded! You will now regularly get"
                     " cybernews on time - 09:35 PM IST."
                 )
-                try:
-                  requests.post(
-                      f"https://api.telegram.org/bot{TOKEN}/sendMessage",
-                      json={"chat_id": chat_id, "text": welcome_msg},
-                      timeout=10,
-                  )
-                except Exception:
-                  pass
+              else:
+                reply_msg = (
+                    "Bot is active! You are already registered for daily"
+                    " briefings at 09:35 PM IST. 🛡️"
+                )
+
+              try:
+                requests.post(
+                    f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+                    json={"chat_id": chat_id, "text": reply_msg},
+                    timeout=10,
+                )
+              except Exception:
+                pass
 
       schedule.run_pending()
     except Exception as e:
