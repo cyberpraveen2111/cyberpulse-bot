@@ -2,7 +2,7 @@ name: CyberPulse Daily Dispatch
 
 on:
   schedule:
-    - cron: '02 16 * * *' # Runs daily at 09:32 PM IST (16:02 UTC)
+    - cron: '05 16 * * *' # Runs daily at 09:35 PM IST (16:05 UTC)
   workflow_dispatch:
 
 permissions:
