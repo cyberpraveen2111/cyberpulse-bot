@@ -98,7 +98,7 @@ def run_bot():
                 save_users(users)
                 reply_msg = (
                     "Your ID has been recorded! You will now regularly get"
-                    " cybernews on time - 09:35 PM IST."
+                    " cybernews on time - 08:00 AM IST."
                 )
               else:
                 reply_msg = (
